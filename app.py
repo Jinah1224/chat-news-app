@@ -8,7 +8,7 @@ import re
 import time
 import chardet
 
-# 뉴스 키워드 및 분류
+# 키워드 설정
 keywords = ["천재교육", "천재교과서", "지학사", "벽호", "프린피아", "미래엔", "교과서", "동아출판"]
 category_keywords = {
     "후원": ["후원", "기탁"],
@@ -107,7 +107,7 @@ def match_keyword_flag(text):
 def contains_textbook(text):
     return "O" if "교과서" in text or "발행사" in text else "X"
 
-# 카카오톡 분석 키워드
+# 카카오톡 분류용 키워드
 kakao_categories = {
     "채택: 선정 기준/평가": ["평가표", "기준", "추천의견서", "선정기준"],
     "채택: 위원회 운영": ["위원회", "협의회", "대표교사", "위원"],
@@ -131,19 +131,16 @@ def analyze_kakao(text):
     current_date = None
     results = []
 
-    # 날짜 1회만 감지
     for line in text.splitlines():
         match = date_line_pattern.match(line)
         if match:
             year, month, day = map(int, match.groups())
             current_date = datetime(year, month, day).date()
             break
+    if not current_date:
+        current_date = datetime.today().date()  # ✅ 기본값 설정
 
-    # 메시지 추출
     for match in message_pattern.finditer(text):
-        if not current_date:
-            continue
-
         sender = match.group("sender")
         ampm = match.group("ampm")
         hour = int(match.group("hour"))
