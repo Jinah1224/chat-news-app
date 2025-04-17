@@ -107,7 +107,7 @@ def match_keyword_flag(text):
 def contains_textbook(text):
     return "O" if "교과서" in text or "발행사" in text else "X"
 
-# 카카오톡 분류용 키워드
+# 카카오톡 관련 설정
 kakao_categories = {
     "채택: 선정 기준/평가": ["평가표", "기준", "추천의견서", "선정기준"],
     "채택: 위원회 운영": ["위원회", "협의회", "대표교사", "위원"],
@@ -138,7 +138,7 @@ def analyze_kakao(text):
             current_date = datetime(year, month, day).date()
             break
     if not current_date:
-        current_date = datetime.today().date()  # ✅ 기본값 설정
+        current_date = datetime.today().date()
 
     for match in message_pattern.finditer(text):
         sender = match.group("sender")
