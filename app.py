@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -7,7 +8,7 @@ import re
 import time
 import chardet
 
-# 뉴스 키워드 및 분류 기준
+# 뉴스 키워드 및 분류
 keywords = ["천재교육", "천재교과서", "지학사", "벽호", "프린피아", "미래엔", "교과서", "동아출판"]
 category_keywords = {
     "후원": ["후원", "기탁"],
@@ -106,7 +107,7 @@ def match_keyword_flag(text):
 def contains_textbook(text):
     return "O" if "교과서" in text or "발행사" in text else "X"
 
-# 카카오톡 분석
+# 카카오톡 분석 키워드
 kakao_categories = {
     "채택: 선정 기준/평가": ["평가표", "기준", "추천의견서", "선정기준"],
     "채택: 위원회 운영": ["위원회", "협의회", "대표교사", "위원"],
@@ -120,7 +121,6 @@ subjects = ["국어", "수학", "사회", "과학", "영어"]
 complaint_keywords = ["안 왔어요", "늦게", "없어요", "문제", "헷갈려", "불편"]
 
 def analyze_kakao(text):
-    # 날짜 포함 형식도 처리 가능하도록 수정
     date_line_pattern = re.compile(r"-+\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일.*?-+")
     message_pattern = re.compile(
         r"\[(?P<sender>.*?)\]\s*\[(?P<ampm>오전|오후)\s*(?P<hour>\d{1,2}):(?P<minute>\d{2})\]\s*(?P<message>.*?)(?=
@@ -128,16 +128,18 @@ def analyze_kakao(text):
         re.DOTALL
     )
 
-    lines = text.splitlines()
     current_date = None
     results = []
 
-    for line in lines:
-        date_match = date_line_pattern.match(line)
-        if date_match:
-            year, month, day = map(int, date_match.groups())
+    # 날짜 1회만 감지
+    for line in text.splitlines():
+        match = date_line_pattern.match(line)
+        if match:
+            year, month, day = map(int, match.groups())
             current_date = datetime(year, month, day).date()
+            break
 
+    # 메시지 추출
     for match in message_pattern.finditer(text):
         if not current_date:
             continue
