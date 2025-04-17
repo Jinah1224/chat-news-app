@@ -7,8 +7,9 @@ from bs4 import BeautifulSoup
 from io import StringIO
 import re
 import time
-import openpyxl
+import chardet
 
+# 키워드 설정
 keywords = ["천재교육", "천재교과서", "지학사", "벽호", "프린피아", "미래엔", "교과서", "동아출판"]
 category_keywords = {
     "후원": ["후원", "기탁"],
@@ -107,7 +108,7 @@ def match_keyword_flag(text):
 def contains_textbook(text):
     return "O" if "교과서" in text or "발행사" in text else "X"
 
-# 카카오톡 분석
+# 카카오톡 분석기
 kakao_categories = {
     "채택: 선정 기준/평가": ["평가표", "기준", "추천의견서", "선정기준"],
     "채택: 위원회 운영": ["위원회", "협의회", "대표교사", "위원"],
@@ -125,7 +126,7 @@ def analyze_kakao(text):
     current_date = None
     rows = []
     date_pattern = re.compile(r"-+ (\d{4})년 (\d{1,2})월 (\d{1,2})일")
-    msg_pattern = re.compile(r"\[(.*?)\] \[(오전|오후) (\d{1,2}):(\d{2})\] (.+)")
+    msg_pattern = re.compile(r"\[(.*?)\]\s*\[(오전|오후)\s*(\d{1,2}):(\d{2})\]\s*(.+)")
 
     for line in lines:
         date_match = date_pattern.match(line)
@@ -177,7 +178,7 @@ def extract_subject(text):
 def detect_complaint(text):
     return any(w in text for w in complaint_keywords)
 
-# Streamlit 앱
+# Streamlit 앱 시작
 st.set_page_config(page_title="📚 올인원 교과서 분석기", layout="wide")
 st.title("📚 교과서 커뮤니티 분석 & 뉴스 수집 올인원 앱")
 
@@ -187,20 +188,19 @@ with tab1:
     st.subheader("카카오톡 .txt 파일 업로드")
     uploaded_file = st.file_uploader("카카오톡 대화 파일을 업로드하세요", type="txt")
     if uploaded_file:
-        try:
-            text_raw = uploaded_file.getvalue().decode("utf-8")
-        except UnicodeDecodeError:
-            try:
-                text_raw = uploaded_file.getvalue().decode("utf-8-sig")
-            except:
-                text_raw = uploaded_file.getvalue().decode("euc-kr", errors="ignore")
+        raw_bytes = uploaded_file.read()
+        detected = chardet.detect(raw_bytes)
+        encoding = detected["encoding"] or "utf-8"
+        text_raw = raw_bytes.decode(encoding, errors="ignore")
 
+        st.write("📌 감지된 인코딩:", encoding)
         df_kakao = analyze_kakao(text_raw)
 
         if df_kakao.empty:
             st.warning("⚠️ 메시지를 파싱할 수 없습니다. 파일 형식이나 내용 구조를 확인해주세요.")
         else:
             st.success("✅ 분석 완료")
+            st.write("🔍 총 분석된 메시지 수:", len(df_kakao))
             st.dataframe(df_kakao)
             st.download_button("📥 분석 결과 다운로드", df_kakao.to_csv(index=False).encode("utf-8"), "카카오톡_분석결과.csv", "text/csv")
 
