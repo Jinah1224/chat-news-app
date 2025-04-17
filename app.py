@@ -4,12 +4,11 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
-from io import StringIO
 import re
 import time
 import chardet
 
-# 키워드 설정
+# 뉴스 키워드
 keywords = ["천재교육", "천재교과서", "지학사", "벽호", "프린피아", "미래엔", "교과서", "동아출판"]
 category_keywords = {
     "후원": ["후원", "기탁"],
@@ -108,7 +107,7 @@ def match_keyword_flag(text):
 def contains_textbook(text):
     return "O" if "교과서" in text or "발행사" in text else "X"
 
-# 카카오톡 분석기
+# 카카오톡 분석
 kakao_categories = {
     "채택: 선정 기준/평가": ["평가표", "기준", "추천의견서", "선정기준"],
     "채택: 위원회 운영": ["위원회", "협의회", "대표교사", "위원"],
@@ -122,40 +121,53 @@ subjects = ["국어", "수학", "사회", "과학", "영어"]
 complaint_keywords = ["안 왔어요", "늦게", "없어요", "문제", "헷갈려", "불편"]
 
 def analyze_kakao(text):
-    lines = text.splitlines()
+    # 날짜 추출
+    date_lines = re.findall(r"-+ (\d{4})년 (\d{1,2})월 (\d{1,2})일.*?-+", text)
+    date_map = {}
     current_date = None
-    rows = []
-    date_pattern = re.compile(r"-+ (\d{4})년 (\d{1,2})월 (\d{1,2})일")
-    msg_pattern = re.compile(r"\[(.*?)\]\s*\[(오전|오후)\s*(\d{1,2}):(\d{2})\]\s*(.+)")
+    for match in date_lines:
+        y, m, d = map(int, match)
+        current_date = datetime(y, m, d).date()
+        date_map[current_date] = True
 
+    # 메시지 정규표현식: 다중라인 메시지도 대응
+    pattern = re.compile(r"\[(?P<sender>.*?)\]\s*\[(?P<ampm>오전|오후)\s*(?P<hour>\d{1,2}):(?P<minute>\d{2})\]\s*(?P<message>.+?)(?=\n\[|\Z)", re.DOTALL)
+
+    messages = []
+    date = None
+    lines = text.splitlines()
     for line in lines:
-        date_match = date_pattern.match(line)
-        if date_match:
-            year, month, day = map(int, date_match.groups())
-            current_date = datetime(year, month, day).date()
+        if re.match(r"-+ (\d{4})년 (\d{1,2})월 (\d{1,2})일", line):
+            date_match = re.findall(r"(\d{4})년 (\d{1,2})월 (\d{1,2})일", line)[0]
+            y, m, d = map(int, date_match)
+            date = datetime(y, m, d).date()
             continue
 
-        msg_match = msg_pattern.match(line)
-        if msg_match and current_date:
-            sender, ampm, hour, minute, message = msg_match.groups()
-            hour = int(hour)
+        msg_match = pattern.match(line)
+        if msg_match and date:
+            sender = msg_match.group("sender")
+            ampm = msg_match.group("ampm")
+            hour = int(msg_match.group("hour"))
+            minute = msg_match.group("minute")
+            message = msg_match.group("message").strip()
+
             if ampm == "오후" and hour != 12:
                 hour += 12
             elif ampm == "오전" and hour == 12:
                 hour = 0
             time_obj = datetime.strptime(f"{hour}:{minute}", "%H:%M").time()
 
-            rows.append({
-                "날짜": current_date,
+            messages.append({
+                "날짜": date,
                 "시간": time_obj,
-                "보낸 사람": sender.strip(),
-                "메시지": message.strip(),
+                "보낸 사람": sender,
+                "메시지": message,
                 "카테고리": classify_category(message),
                 "출판사": extract_kakao_publisher(message),
                 "과목": extract_subject(message),
                 "불만 여부": detect_complaint(message)
             })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(messages)
 
 def classify_category(text):
     for cat, words in kakao_categories.items():
@@ -178,8 +190,8 @@ def extract_subject(text):
 def detect_complaint(text):
     return any(w in text for w in complaint_keywords)
 
-# Streamlit 앱 시작
-st.set_page_config(page_title="📚 올인원 교과서 분석기", layout="wide")
+# Streamlit 앱
+st.set_page_config(page_title="📚 교과서 분석기", layout="wide")
 st.title("📚 교과서 커뮤니티 분석 & 뉴스 수집 올인원 앱")
 
 tab1, tab2 = st.tabs(["💬 카카오톡 분석", "📰 뉴스 크롤링"])
