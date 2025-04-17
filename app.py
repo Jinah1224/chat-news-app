@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -8,9 +9,6 @@ import re
 import time
 import openpyxl
 
-# -------------------------------
-# 키워드 및 기준 정의
-# -------------------------------
 keywords = ["천재교육", "천재교과서", "지학사", "벽호", "프린피아", "미래엔", "교과서", "동아출판"]
 category_keywords = {
     "후원": ["후원", "기탁"],
@@ -26,9 +24,6 @@ category_keywords = {
     "이벤트": ["이벤트", "사은품"]
 }
 
-# -------------------------------
-# 뉴스 관련 함수
-# -------------------------------
 def crawl_news_quick(keyword, pages=5):
     headers = {"User-Agent": "Mozilla/5.0"}
     results = []
@@ -112,9 +107,7 @@ def match_keyword_flag(text):
 def contains_textbook(text):
     return "O" if "교과서" in text or "발행사" in text else "X"
 
-# -------------------------------
-# 카카오톡 분석 함수 (개선된 버전)
-# -------------------------------
+# 카카오톡 분석
 kakao_categories = {
     "채택: 선정 기준/평가": ["평가표", "기준", "추천의견서", "선정기준"],
     "채택: 위원회 운영": ["위원회", "협의회", "대표교사", "위원"],
@@ -149,7 +142,6 @@ def analyze_kakao(text):
                 hour += 12
             elif ampm == "오전" and hour == 12:
                 hour = 0
-
             time_obj = datetime.strptime(f"{hour}:{minute}", "%H:%M").time()
 
             rows.append({
@@ -185,9 +177,7 @@ def extract_subject(text):
 def detect_complaint(text):
     return any(w in text for w in complaint_keywords)
 
-# -------------------------------
 # Streamlit 앱
-# -------------------------------
 st.set_page_config(page_title="📚 올인원 교과서 분석기", layout="wide")
 st.title("📚 교과서 커뮤니티 분석 & 뉴스 수집 올인원 앱")
 
@@ -197,11 +187,22 @@ with tab1:
     st.subheader("카카오톡 .txt 파일 업로드")
     uploaded_file = st.file_uploader("카카오톡 대화 파일을 업로드하세요", type="txt")
     if uploaded_file:
-        stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
-        df_kakao = analyze_kakao(stringio.read())
-        st.success("✅ 분석 완료")
-        st.dataframe(df_kakao)
-        st.download_button("📥 분석 결과 다운로드", df_kakao.to_csv(index=False).encode("utf-8"), "카카오톡_분석결과.csv", "text/csv")
+        try:
+            text_raw = uploaded_file.getvalue().decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                text_raw = uploaded_file.getvalue().decode("utf-8-sig")
+            except:
+                text_raw = uploaded_file.getvalue().decode("euc-kr", errors="ignore")
+
+        df_kakao = analyze_kakao(text_raw)
+
+        if df_kakao.empty:
+            st.warning("⚠️ 메시지를 파싱할 수 없습니다. 파일 형식이나 내용 구조를 확인해주세요.")
+        else:
+            st.success("✅ 분석 완료")
+            st.dataframe(df_kakao)
+            st.download_button("📥 분석 결과 다운로드", df_kakao.to_csv(index=False).encode("utf-8"), "카카오톡_분석결과.csv", "text/csv")
 
 with tab2:
     st.subheader("출판사 관련 뉴스 수집 (최근 2주)")
