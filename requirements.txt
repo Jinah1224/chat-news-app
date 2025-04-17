@@ -1,9 +1,9 @@
 streamlit
 pandas
-requests
 beautifulsoup4
 lxml
 openpyxl
 chardet
+requests
 
 
